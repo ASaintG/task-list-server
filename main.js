@@ -1,4 +1,6 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
 const app = express();
 const project3Router = express.Router();
 const listEditRouter = express.Router();
@@ -6,24 +8,60 @@ const listViewRouter = express.Router();
 
 const port = 8080;
 
-listEditRouter.use('/create', (req, res, next) => {
-    if (req.method === 'POST') {
-        if (!req.body || Object.keys(req.body).length === 0) {
-            return res.status(400).send('Cuerpo de solicitud vacío');
-        }
-        
+const users = [
+    { username: 'usuario1', password: 'clave1' },
+    { username: 'usuario2', password: 'clave2' },
+   
+];
+
+// Ruta de login
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+
+    // Verifica las credenciales del usuario
+    const user = users.find(u => u.username === username && u.password === password);
+
+    if (!user) {
+        return res.status(401).json({ error: 'Credenciales inválidas' });
     }
+
+    // Crea un token JWT
+    const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    res.json({ token });
+});
+
+// Middleware para validar el token en las rutas protegidas
+function authenticateToken(req, res, next) {
+    const token = req.header('Authorization');
+
+    if (!token) {
+        return res.status(401).json({ error: 'Acceso no autorizado. Token no proporcionado.' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'Acceso prohibido. Token inválido.' });
+        }
+
+        req.user = user;
+        next();
+    });
+}
+
+// Ruta protegida
+app.get('/protected-route', authenticateToken, (req, res) => {
+    res.json({ message: 'Acceso autorizado a la ruta protegida', user: req.user });
+});
+
+// Implementa las rutas existentes con los middlewares adecuados
+listEditRouter.use('/create', authenticateToken, (req, res, next) => {
+    // Tu lógica para list-edit/create
     next();
 });
 
-// Middleware para manejar solicitudes PUT con cuerpo vacío o información no válida
-listEditRouter.use('/update', (req, res, next) => {
-    if (req.method === 'PUT') {
-        if (!req.body || Object.keys(req.body).length === 0) {
-            return res.status(400).send('Cuerpo de solicitud vacío');
-        }
-       
-    }
+listEditRouter.use('/update', authenticateToken, (req, res, next) => {
+    // Tu lógica para list-edit/update
     next();
 });
 
@@ -37,9 +75,9 @@ app.use((req, res, next) => {
 });
 
 // Middleware para list-view-router que gestiona parámetros incorrectos
-listViewRouter.use('/:id', (req, res, next) => {
+listViewRouter.use('/:id', authenticateToken, (req, res, next) => {
     const id = req.params.id;
-  
+
     if (!isValidId(id)) {
         return res.status(400).send('Parámetro incorrecto');
     }
@@ -47,7 +85,7 @@ listViewRouter.use('/:id', (req, res, next) => {
 });
 
 // Ejemplo de una ruta para probar el middleware list-view-router
-listViewRouter.get('/:id', (req, res) => {
+listViewRouter.get('/:id', authenticateToken, (req, res) => {
     res.send(`Vista de la lista con ID ${req.params.id}`);
 });
 
@@ -56,9 +94,7 @@ app.use('/project-3', project3Router);
 project3Router.use('/list-edit', listEditRouter);
 project3Router.use('/list-view', listViewRouter);
 
-
 function isValidId(id) {
-   
     return /^\d+$/.test(id);
 }
 
