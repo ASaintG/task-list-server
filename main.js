@@ -2,34 +2,15 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const app = express();
-const project3Router = express.Router();
-const listEditRouter = express.Router();
-const listViewRouter = express.Router();
+const taskRouter = express.Router();
 
 const port = 8080;
 
-const users = [
-    { username: 'usuario1', password: 'clave1' },
-    { username: 'usuario2', password: 'clave2' },
-   
+const tasks = [
+    { id: 1, title: 'Hacer la compra', completed: false },
+    { id: 2, title: 'Terminar proyecto', completed: true },
+    
 ];
-
-// Ruta de login
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-
-    // Verifica las credenciales del usuario
-    const user = users.find(u => u.username === username && u.password === password);
-
-    if (!user) {
-        return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
-
-    // Crea un token JWT
-    const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    res.json({ token });
-});
 
 // Middleware para validar el token en las rutas protegidas
 function authenticateToken(req, res, next) {
@@ -49,61 +30,74 @@ function authenticateToken(req, res, next) {
     });
 }
 
-// Ruta protegida
-app.get('/protected-route', authenticateToken, (req, res) => {
-    res.json({ message: 'Acceso autorizado a la ruta protegida', user: req.user });
+// Rutas CRUD para la lista de tareas
+taskRouter.post('/', authenticateToken, (req, res) => {
+    // Crear una nueva tarea
+    const newTask = { id: tasks.length + 1, title: req.body.title, completed: false };
+    tasks.push(newTask);
+    res.status(201).json(newTask);
 });
 
-// Implementa las rutas existentes con los middlewares adecuados
-listEditRouter.use('/create', authenticateToken, (req, res, next) => {
-    // Tu lógica para list-edit/create
-    next();
+taskRouter.get('/', authenticateToken, (req, res) => {
+    // Listar todas las tareas
+    res.json(tasks);
 });
 
-listEditRouter.use('/update', authenticateToken, (req, res, next) => {
-    // Tu lógica para list-edit/update
-    next();
+taskRouter.get('/completed', authenticateToken, (req, res) => {
+    // Listar las tareas completas
+    const completedTasks = tasks.filter(task => task.completed);
+    res.json(completedTasks);
 });
 
-// Middleware a nivel de aplicación para gestionar métodos HTTP válidos
-app.use((req, res, next) => {
-    const validMethods = ['GET', 'POST', 'PUT', 'DELETE'];
-    if (!validMethods.includes(req.method)) {
-        return res.status(400).send('Método HTTP no válido');
+taskRouter.get('/incomplete', authenticateToken, (req, res) => {
+    // Listar las tareas incompletas
+    const incompleteTasks = tasks.filter(task => !task.completed);
+    res.json(incompleteTasks);
+});
+
+taskRouter.get('/:id', authenticateToken, (req, res) => {
+    // Obtener una sola tarea por ID
+    const taskId = parseInt(req.params.id);
+    const task = tasks.find(task => task.id === taskId);
+
+    if (!task) {
+        return res.status(404).json({ error: 'Tarea no encontrada.' });
     }
-    next();
+
+    res.json(task);
 });
 
-// Middleware para list-view-router que gestiona parámetros incorrectos
-listViewRouter.use('/:id', authenticateToken, (req, res, next) => {
-    const id = req.params.id;
+taskRouter.put('/:id', authenticateToken, (req, res) => {
+    // Actualizar una tarea por ID
+    const taskId = parseInt(req.params.id);
+    const task = tasks.find(task => task.id === taskId);
 
-    if (!isValidId(id)) {
-        return res.status(400).send('Parámetro incorrecto');
+    if (!task) {
+        return res.status(404).json({ error: 'Tarea no encontrada.' });
     }
-    next();
+
+    task.title = req.body.title || task.title;
+    task.completed = req.body.completed || task.completed;
+
+    res.json(task);
 });
 
-// Ejemplo de una ruta para probar el middleware list-view-router
-listViewRouter.get('/:id', authenticateToken, (req, res) => {
-    res.send(`Vista de la lista con ID ${req.params.id}`);
+taskRouter.delete('/:id', authenticateToken, (req, res) => {
+    // Eliminar una tarea por ID
+    const taskId = parseInt(req.params.id);
+    const index = tasks.findIndex(task => task.id === taskId);
+
+    if (index === -1) {
+        return res.status(404).json({ error: 'Tarea no encontrada.' });
+    }
+
+    const deletedTask = tasks.splice(index, 1)[0];
+    res.json(deletedTask);
 });
 
-// Asigna los routers a las rutas específicas
-app.use('/project-3', project3Router);
-project3Router.use('/list-edit', listEditRouter);
-project3Router.use('/list-view', listViewRouter);
-
-function isValidId(id) {
-    return /^\d+$/.test(id);
-}
+app.use('/tasks', taskRouter);
 
 app.use(express.json());
-
-// Ruta de prueba para asegurarse de que la aplicación está en funcionamiento
-app.get('/this-should-exists', (req, res) => {
-    res.status(404).send('Not found');
-});
 
 app.listen(port, () => {
     console.log(`Servidor escuchando en http://localhost:${port}`);
