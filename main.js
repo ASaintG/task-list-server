@@ -54,14 +54,14 @@ app.get('/protected-route', authenticateToken, (req, res) => {
     res.json({ message: 'Acceso autorizado a la ruta protegida', user: req.user });
 });
 
-// Implementa las rutas existentes con los middlewares adecuados
+
 listEditRouter.use('/create', authenticateToken, (req, res, next) => {
-    // Tu lógica para list-edit/create
+  
     next();
 });
 
 listEditRouter.use('/update', authenticateToken, (req, res, next) => {
-    // Tu lógica para list-edit/update
+
     next();
 });
 
@@ -74,7 +74,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Middleware para list-view-router que gestiona parámetros incorrectos
 listViewRouter.use('/:id', authenticateToken, (req, res, next) => {
     const id = req.params.id;
 
@@ -84,12 +83,12 @@ listViewRouter.use('/:id', authenticateToken, (req, res, next) => {
     next();
 });
 
-// Ejemplo de una ruta para probar el middleware list-view-router
+
 listViewRouter.get('/:id', authenticateToken, (req, res) => {
     res.send(`Vista de la lista con ID ${req.params.id}`);
 });
 
-// Asigna los routers a las rutas específicas
+
 app.use('/project-3', project3Router);
 project3Router.use('/list-edit', listEditRouter);
 project3Router.use('/list-view', listViewRouter);
@@ -100,7 +99,6 @@ function isValidId(id) {
 
 app.use(express.json());
 
-// Ruta de prueba para asegurarse de que la aplicación está en funcionamiento
 app.get('/this-should-exists', (req, res) => {
     res.status(404).send('Not found');
 });
